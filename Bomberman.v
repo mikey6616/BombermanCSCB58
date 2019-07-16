@@ -1,48 +1,37 @@
 // Part 2 skeleton
 
-module lab_6b
-	(
-		CLOCK_50,						//	On Board 50 MHz
-		// Your inputs and outputs here
-        KEY,
-        SW,
-		// The ports below are for the VGA output.  Do not change.
-		VGA_CLK,   						//	VGA Clock
-		VGA_HS,							//	VGA H_SYNC
-		VGA_VS,							//	VGA V_SYNC
-		VGA_BLANK_N,						//	VGA BLANK
-		VGA_SYNC_N,						//	VGA SYNC
-		VGA_R,   						//	VGA Red[9:0]
-		VGA_G,	 						//	VGA Green[9:0]
-		VGA_B,
-		HEX0,
-		HEX1   						//	VGA Blue[9:0]
-	);
-
-	input			CLOCK_50;				//	50 MHz
-	input   [12:0]   SW;
-	input   [3:0]   KEY;
-
-	// Declare your inputs and outputs here
-	// Do not change the following outputs
-	output			VGA_CLK;   				//	VGA Clock
-	output			VGA_HS;					//	VGA H_SYNC
-	output			VGA_VS;					//	VGA V_SYNC
-	output			VGA_BLANK_N;				//	VGA BLANK
-	output			VGA_SYNC_N;				//	VGA SYNC
-	output	[9:0]	VGA_R;   				//	VGA Red[9:0]
-	output	[9:0]	VGA_G;	 				//	VGA Green[9:0]
-	output	[9:0]	VGA_B; 
-	output [6:0] HEX0, HEX1;  				//	VGA Blue[9:0]
+module bomberman(
+	input	CLOCK_50,				//	50 MHz
+	input   [12:0]   SW,
+	input   [3:0]   KEY,
+	input 	PS2_KBCLK,
+	input 	PS2_KBDAT,
 	
-	wire resetn;
+	output			VGA_CLK,   				//	VGA Clock
+	output			VGA_HS,					//	VGA H_SYNC
+	output			VGA_VS,					//	VGA V_SYNC
+	output			VGA_BLANK_N,				//	VGA BLANK
+	output			VGA_SYNC_N,				//	VGA SYNC
+	output	[9:0]	VGA_R,   				//	VGA Red[9:0]
+	output	[9:0]	VGA_G,	 				//	VGA Green[9:0]
+	output	[9:0]	VGA_B, 
+	output [6:0] HEX0, HEX1  				//	VGA Blue[9:0]
+	);
+	
+	wire resetn, go;
+	wire [7:0] key_input;
 	assign resetn = KEY[0];
 	assign go = ~KEY[2];
-	
 	// Create the colour, x, y and writeEn wires that are inputs to the controller.
 	wire [7:0] x;
 	wire [6:0] y;
 	wire writeEn;
+	
+	keyboard kb(
+		.mapped_key(key_input[7:0]),
+		.kb_clock(PS2_KBCLK),
+		.kb_data(PS2_KBDAT)
+	);
 
 	// Create an Instance of a VGA controller - there can be only one!
 	// Define the number of colours as well as the initial background
@@ -50,7 +39,7 @@ module lab_6b
 	vga_adapter VGA(
 			.resetn(resetn),
 			.clock(CLOCK_50),
-			.colour(SW[10:8]), //BIG KIDS
+			.colour(colour), //BIG KIDS
 			.x(x),//BIG KIDS
 			.y(y),//BIG KIDS
 			.plot(writeEn),//BIG KIDS
@@ -72,132 +61,126 @@ module lab_6b
 	// for the VGA controller, in addition to any other functionality your design may require.
     
     // Instansiate datapath
-    wire ld_x, ld_y, en_draw;
-    wire [3:0] incrementer;
+    wire en_draw;
+    wire [5:0] incrementer;
+	wire [7:0] p_x;
+	wire [6:0] p_y;
+	wire [2:0] colour;
 
-	control C0(
+	p1control C0(
         .clk(CLOCK_50),
-        
-        .go(go),
-        .ld_x(ld_x),
-	.ld_y(ld_y),
-	.en_draw(en_draw),
-	.incrementer(incrementer),
+        .key_input(key_input[3:0]),
+        .p_x(p_x),
+		.p_y(p_y),
+		.colour(colour),
+		.en_draw(en_draw),
+		.incrementer(incrementer),
     	);
 
 	datapath D0(
         .clk(CLOCK_50),
-
-        .ld_x(ld_x),
-	.ld_y(ld_y),
-	.en_draw(en_draw),
-	.incrementer(incrementer),
+		.en_draw(en_draw),
+		.incrementer(incrementer),
+		.p_x(p_x),//BIG KIDS
+		.p_y(p_y),//BIG KIDS
         .x(x),//BIG KIDS
-	.y(y),//BIG KIDS
-	.writeEn(writeEn),//BIG KIDS
-
-	.data_in(SW[7:0])
-
+		.y(y),//BIG KIDS
+		.writeEn(writeEn)//BIG KIDS
     	);
-
-    hex_display h1(ld_x, HEX0);
-    hex_display h2(ld_y, HEX1);
 
     // Instansiate FSM control
     
     
 endmodule
 
-module control(
+module p1control(
     input clk,
     input go,
-
-    output reg  ld_x, ld_y, en_draw,
-    output reg  [3:0] incrementer
+	input reg [3:0] key_input,
+	
+    output reg  en_draw,
+    output reg  [5:0] incrementer
+	output reg [7:0] p_x,
+	output reg [6:0] p_y,
+	output reg [2:0] colour
     );
 
-    reg [5:0] current_state, next_state; 
+    reg [5:0] current_state, next_state;
+	reg [9:0] current_pos, next_pos; 
     
-    localparam  S_LOAD_X        = 5'd0,
-                S_LOAD_X_WAIT   = 5'd1,
-                S_LOAD_Y        = 5'd2,
-                S_LOAD_Y_WAIT   = 5'd3,
-                S_CYCLE_DRAW        = 5'd4;
+    localparam  S_WAIT          = 5'd0,
+                S_CLEAR_PAST    = 5'd1,
+                S_DRAW_NEW      = 5'd2,
+				K_UP 			= 8'b0001,
+				K_DOWN 			= 8'b0010,
+				K_LEFT 			= 8'b0100,
+				K_RIGHT 		= 8'b1000;
     
     // Next state logic aka our state table
     always@(*)
     begin: state_table 
             case (current_state)
-                S_LOAD_X: next_state = go ? S_LOAD_X_WAIT : S_LOAD_X; // Loop in current state until value is input
-                S_LOAD_X_WAIT: next_state = go ? S_LOAD_X_WAIT : S_LOAD_Y; // Loop in current state until go signal goes low
-                S_LOAD_Y: next_state = go ? S_LOAD_Y_WAIT : S_LOAD_Y; // Loop in current state until value is input
-                S_LOAD_Y_WAIT: next_state = go ? S_LOAD_Y_WAIT : S_CYCLE_DRAW;
-                S_CYCLE_DRAW: next_state = S_LOAD_X;
-            default:     next_state = S_LOAD_X;
+                S_WAIT: next_state = S_CLEAR_PAST; // Loop in current state until value is input
+                S_CLEAR_PAST: next_state = S_DRAW_NEW; // Loop in current state until go signal goes low
+                S_DRAW_NEW: next_state = S_WAIT; // Loop in current state until value is input
+            default:  next_state = S_WAIT;
         endcase
     end // state_table
    
-
     // Output logic aka all of our datapath control signals
     always @(*)
     begin: enable_signals
-        // By default make all our signals 0
-        ld_x = 1'b0;
-	     ld_y = 1'b0;
-	     en_draw = 1'b0;
-
-        case (current_state)
-            S_LOAD_X: begin
-                ld_x = 1'b1;
-                end
-            S_LOAD_Y: begin
-                ld_y = 1'b1;
-                end
-            S_CYCLE_DRAW: begin
-                en_draw = 1'b1;
-                end
-        // default:    // don't need default since we already made sure all of our outputs were assigned a value at the start of the always block
-        endcase
+		en_draw = 1'b0;
+		colour = 3'b001;
+        if (current_state == S_WAIT) begin
+			case (key_input)
+				K_UP: next_pos = current_pos - 10'd1;
+				K_DOWN: next_pos = current_pos + 10'd1;
+				K_LEFT: next_pos = current_pos - 10'b0000100000;
+				K_RIGHT: next_pos = current_pos + 10'b0000100000;
+				default: next_pos = current_pos;
+			endcase
+		end
+		else begin
+			colour = 3'b000;
+			p_x = current_pos[9:5] * 8'd8;
+			p_y = current_pos[4:0] * 7'd8;
+			en_draw = 1'b1;
+		end
+		if(current_state == S_CLEAR_PAST)
+			colour = 3'b000;
+		end
     end // enable_signals
    
     // current_state registers
     always@(posedge clk)
     begin: state_FFs
-        if(current_state != S_CYCLE_DRAW) begin
-			   incrementer <= 4'b0000;
-            current_state <= next_state;
-				end
-	else
-	    begin
-	    if(incrementer == 4'b1111)
-		current_state <= next_state;
+        if(incrementer == 6'b111111)begin
+				if(current_state == S_CLEAR_PAST)
+					current_pos <= next_pos;
+				if(current_state == S_WAIT)
+					current_state <= next_pos != current_pos? next_state : current_state;
+				else
+					current_state <= next_state;
+				incrementer <= 6'b000000;
+			end
 	    else
-		incrementer <= incrementer + 4'b0001;
+			incrementer <= incrementer + 6'b000001;
 	    end
     end // state_FFS
 endmodule
 
 module datapath(
     input clk,
-    input [7:0] data_in,
-    input ld_x, ld_y, en_draw,
-    input [3:0] incrementer, 
+    input  en_draw,
+    input [5:0] incrementer, 
+	input [7:0] p_x,
+	input [6:0] p_y,
+	
     output reg writeEn,
     output reg [7:0] x,
     output reg [6:0] y
     );
-    
-    reg [7:0] p_x, p_y;
-    
-    // Registers x, y with respective input logic
-    always@(posedge clk) 
-	begin begin
-            if(ld_x)
-                p_x <= data_in;
-            if(ld_y)
-                p_y <= data_in[6:0];
-        end
-    end
  
 
     // If writer
@@ -211,8 +194,8 @@ module datapath(
 					 end
             1'd1:begin
                 writeEn = 1'b1;
-		      x = p_x + incrementer[3:2];
-		      y = p_y + incrementer[1:0];
+		      x = p_x + incrementer[5:3];
+		      y = p_y + incrementer[2:0];
 		end
             default: begin 
 				writeEn = 1'b0;
