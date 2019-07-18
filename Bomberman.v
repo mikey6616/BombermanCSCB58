@@ -2,8 +2,6 @@
 
 module bomberman(
 	input	CLOCK_50,				//	50 MHz
-	input   [12:0]   SW,
-	input   [3:0]   KEY,
 	input 	PS2_KBCLK,
 	input 	PS2_KBDAT,
 	
@@ -15,13 +13,10 @@ module bomberman(
 	output	[9:0]	VGA_R,   				//	VGA Red[9:0]
 	output	[9:0]	VGA_G,	 				//	VGA Green[9:0]
 	output	[9:0]	VGA_B, 
-	output [6:0] HEX0, HEX1  				//	VGA Blue[9:0]
+	output [6:0] HEX0  				//	VGA Blue[9:0]
 	);
 	
-	wire resetn, go;
 	wire [7:0] key_input;
-	assign resetn = KEY[0];
-	assign go = ~KEY[2];
 	// Create the colour, x, y and writeEn wires that are inputs to the controller.
 	wire [7:0] x;
 	wire [6:0] y;
@@ -37,7 +32,7 @@ module bomberman(
 	// Define the number of colours as well as the initial background
 	// image file (.MIF) for the controller.
 	vga_adapter VGA(
-			.resetn(resetn),
+			.resetn(1'b1),
 			.clock(CLOCK_50),
 			.colour(colour), //BIG KIDS
 			.x(x),//BIG KIDS
@@ -78,7 +73,7 @@ module bomberman(
     	);
 
 	datapath D0(
-        .clk(CLOCK_50),
+      .clk(CLOCK_50),
 		.en_draw(en_draw),
 		.incrementer(incrementer),
 		.p_x(p_x),//BIG KIDS
@@ -87,7 +82,8 @@ module bomberman(
 		.y(y),//BIG KIDS
 		.writeEn(writeEn)//BIG KIDS
     	);
-
+		
+	hex_display h0(key_input[3:0],HEX0);
     // Instansiate FSM control
     
     
@@ -96,10 +92,10 @@ endmodule
 module p1control(
     input clk,
     input go,
-	input reg [3:0] key_input,
+	input [3:0] key_input,
 	
     output reg  en_draw,
-    output reg  [5:0] incrementer
+    output reg  [5:0] incrementer,
 	output reg [7:0] p_x,
 	output reg [6:0] p_y,
 	output reg [2:0] colour
@@ -107,6 +103,7 @@ module p1control(
 
     reg [5:0] current_state, next_state;
 	reg [9:0] current_pos, next_pos; 
+	reg [14:0] wait_counter;
     
     localparam  S_WAIT          = 5'd0,
                 S_CLEAR_PAST    = 5'd1,
@@ -141,15 +138,12 @@ module p1control(
 				default: next_pos = current_pos;
 			endcase
 		end
-		else begin
-			colour = 3'b000;
-			p_x = current_pos[9:5] * 8'd8;
-			p_y = current_pos[4:0] * 7'd8;
+		else
 			en_draw = 1'b1;
-		end
 		if(current_state == S_CLEAR_PAST)
 			colour = 3'b000;
-		end
+		p_x = current_pos[9:5] * 8'd8;
+		p_y = current_pos[4:0] * 7'd8;
     end // enable_signals
    
     // current_state registers
@@ -158,15 +152,20 @@ module p1control(
         if(incrementer == 6'b111111)begin
 				if(current_state == S_CLEAR_PAST)
 					current_pos <= next_pos;
-				if(current_state == S_WAIT)
-					current_state <= next_pos != current_pos? next_state : current_state;
+				if(current_state == S_WAIT) begin
+					if (wait_counter == 15'b111111111111111) begin
+						current_state <= next_pos != current_pos? next_state : current_state;
+						wait_counter <= 15'd0;
+					end
+					else
+						wait_counter <= wait_counter + 15'd1;
+				end
 				else
 					current_state <= next_state;
 				incrementer <= 6'b000000;
 			end
 	    else
 			incrementer <= incrementer + 6'b000001;
-	    end
     end // state_FFS
 endmodule
 
@@ -186,23 +185,14 @@ module datapath(
     // If writer
     always @(*)
     begin
-        case (en_draw)
-            1'd0: begin
-                writeEn = 1'b0;
-					 x = 4'd0;
-		          y = 4'd0;
-					 end
-            1'd1:begin
-                writeEn = 1'b1;
-		      x = p_x + incrementer[5:3];
-		      y = p_y + incrementer[2:0];
+		writeEn = 1'b0;
+		x = 4'd0;
+		y = 4'd0;		 
+		if (en_draw == 1'b1)	begin 
+			writeEn = 1'b1;
+			x = p_x + incrementer[5:3];
+			y = p_y + incrementer[2:0];
 		end
-            default: begin 
-				writeEn = 1'b0;
-				x = 4'd0;
-		      y = 4'd0;
-				end
-        endcase
     end
     
 endmodule
