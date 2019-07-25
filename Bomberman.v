@@ -1,10 +1,11 @@
 // Part 2 skeleton
 
-module bomberman(
+module Bomberman(
 	input	CLOCK_50,				//	50 MHz
 	input 	PS2_KBCLK,
 	input 	PS2_KBDAT,
-	
+
+	output[17:0]		LEDR,	
 	output			VGA_CLK,   				//	VGA Clock
 	output			VGA_HS,					//	VGA H_SYNC
 	output			VGA_VS,					//	VGA V_SYNC
@@ -13,7 +14,7 @@ module bomberman(
 	output	[9:0]	VGA_R,   				//	VGA Red[9:0]
 	output	[9:0]	VGA_G,	 				//	VGA Green[9:0]
 	output	[9:0]	VGA_B, 
-	output [6:0] HEX0  				//	VGA Blue[9:0]
+	output [6:0] HEX0, HEX1  				//	VGA Blue[9:0]
 	);
 	
 	wire [7:0] key_input;
@@ -61,8 +62,10 @@ module bomberman(
 
 	p1control C0(
         .clk(CLOCK_50),
-        .key_input(key_input[3:0]),
+		  .sample_key(sample_scan),
+        .key_input(key_input),
         .p_x(p_x),
+		  .LEDR(LEDR[0]),
 		.p_y(p_y),
 		.colour(colour),
 		.en_draw(en_draw),
@@ -80,7 +83,8 @@ module bomberman(
 		.writeEn(writeEn)//BIG KIDS
     	);
 		
-	hex_display h0(key_input,HEX0);
+	hex_display h0(key_input[3:0],HEX0);
+	hex_display h1(key_input[7:4],HEX1);
     // Instansiate FSM control
     
     
@@ -89,26 +93,35 @@ endmodule
 module p1control(
     input clk,
     input go,
-	input [3:0] key_input,
+	input [7:0] key_input,
+	input sample_key,
 	
+	output LEDR,
     output reg  en_draw,
     output reg  [5:0] incrementer,
 	output reg [7:0] p_x,
 	output reg [6:0] p_y,
 	output reg [2:0] colour
     );
-
+	reg key_sample;
     reg [5:0] current_state, next_state;
 	reg [9:0] current_pos, next_pos; 
 	reg [14:0] wait_counter;
+	
+	assign LEDR = key_sample;
     
+	 always@(posedge sample_key)
+    begin: FLIPPER
+        key_sample <= key_sample ? 1'b0 : 1'b1;
+    end // state_FFS
+	 
     localparam  S_WAIT          = 5'd0,
                 S_CLEAR_PAST    = 5'd1,
                 S_DRAW_NEW      = 5'd2,
-				K_UP 			= 4'd0,
-				K_DOWN 			= 4'd1,
-				K_LEFT 			= 4'd2,
-				K_RIGHT 		= 4'd3;
+				K_UP 			= 8'h75,
+				K_DOWN 			= 8'h72,
+				K_LEFT 			= 8'h6b,
+				K_RIGHT 		= 8'h74;
     
     // Next state logic aka our state table
     always@(*)
@@ -126,7 +139,7 @@ module p1control(
     begin: enable_signals
 		en_draw = 1'b0;
 		colour = 3'b001;
-        if (current_state == S_WAIT) begin
+        if (current_state == S_WAIT && sample_key) begin
 			case (key_input)
 				K_UP: next_pos = current_pos - 10'd1;
 				K_DOWN: next_pos = current_pos + 10'd1;
