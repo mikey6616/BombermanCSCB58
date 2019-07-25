@@ -1,6 +1,6 @@
 // Part 2 skeleton
 
-module Bomberman(
+module Bomberman( 
 	input	CLOCK_50,				//	50 MHz
 	input 	PS2_KBCLK,
 	input 	PS2_KBDAT,
@@ -104,29 +104,37 @@ module p1control(
 	output reg [2:0] colour
     );
 	reg key_sample;
+	reg [8:0] wall_index; 
     reg [5:0] current_state, next_state;
-	reg [9:0] current_pos, next_pos; 
+	reg [9:0] current_pos, next_pos, current_pos1, current_pos2; 
 	reg [14:0] wait_counter;
-	
+	reg p1_or_p2;
 	assign LEDR = key_sample;
-    
+   
 	 always@(posedge sample_key)
     begin: FLIPPER
         key_sample <= key_sample ? 1'b0 : 1'b1;
     end // state_FFS
 	 
-    localparam  S_WAIT          = 5'd0,
-                S_CLEAR_PAST    = 5'd1,
-                S_DRAW_NEW      = 5'd2,
+    localparam  S_WALLER 		  = 5'd0,
+					 S_WAIT          = 5'd1,
+                S_CLEAR_PAST    = 5'd2,
+                S_DRAW_NEW      = 5'd3,
 				K_UP 			= 8'h75,
 				K_DOWN 			= 8'h72,
 				K_LEFT 			= 8'h6b,
-				K_RIGHT 		= 8'h74;
+				K_RIGHT 		= 8'h74,
+				W_UP			= 8'h1d,
+				A_LEFT		= 8'h1c,
+				S_DOWN		= 8'h1b,
+				D_RIGHT		= 8'h23,
+				WALL_MAP = 300'b111111111111111111111000000000000000000110011000000000011001100110000000000110011000000000000000000110000000000000000001100000001111000000011000000011110000000110000000111100000001100000000000000000011000000000000000000110011000000000011001100110000000000110011000000000000000000111111111111111111111;
     
     // Next state logic aka our state table
     always@(*)
     begin: state_table 
             case (current_state)
+					 S_WALLER: next_state =  S_WAIT;
                 S_WAIT: next_state = S_CLEAR_PAST; // Loop in current state until value is input
                 S_CLEAR_PAST: next_state = S_DRAW_NEW; // Loop in current state until go signal goes low
                 S_DRAW_NEW: next_state = S_WAIT; // Loop in current state until value is input
@@ -138,44 +146,107 @@ module p1control(
     always @(*)
     begin: enable_signals
 		en_draw = 1'b0;
-		colour = 3'b001;
+		if (p1_or_p2)
+			colour = 3'b001;
+		else
+			colour = 3'b110;
         if (current_state == S_WAIT && sample_key) begin
 			case (key_input)
-				K_UP: next_pos = current_pos - 10'd1;
-				K_DOWN: next_pos = current_pos + 10'd1;
-				K_LEFT: next_pos = current_pos - 10'b0000100000;
-				K_RIGHT: next_pos = current_pos + 10'b0000100000;
-				default: next_pos = current_pos;
+				K_UP: begin
+					next_pos = current_pos1 - 10'd1;
+					p1_or_p2 = 1'b1;
+					end
+				K_DOWN: begin
+					next_pos = current_pos1 + 10'd1;
+					p1_or_p2 = 1'b1;
+					end
+				K_LEFT: begin
+					next_pos = current_pos1 - 10'b0000100000;
+					p1_or_p2 = 1'b1;
+					end
+				K_RIGHT: begin
+					next_pos = current_pos1 + 10'b0000100000;
+					p1_or_p2 = 1'b1;
+					end
+				W_UP: begin
+					next_pos = current_pos2 - 10'd1;
+					p1_or_p2 = 1'b0;
+					end
+				S_DOWN: begin
+					next_pos = current_pos2 + 10'd1;
+					p1_or_p2 = 1'b0;
+					end
+				A_LEFT: begin
+					next_pos = current_pos2 - 10'b0000100000;
+					p1_or_p2 = 1'b0;
+					end
+				D_RIGHT: begin
+					next_pos = current_pos2 + 10'b0000100000;
+					p1_or_p2 = 1'b0;
+					end
+				default: begin 
+				if (p1_or_p2)
+					next_pos = current_pos1;
+				else
+					next_pos = current_pos2;
+				end
 			endcase
 		end
 		else
 			en_draw = 1'b1;
 		if(current_state == S_CLEAR_PAST)
 			colour = 3'b000;
-		p_x = current_pos[9:5] * 8'd8;
-		p_y = current_pos[4:0] * 7'd8;
+		else if (current_state == S_WALLER) begin
+			colour = 3'b111;
+			en_draw = WALL_MAP[wall_index] ? 1'b1 : 1'b0;
+		end
+		if (p1_or_p2) begin
+			p_x = current_pos1[9:5] * 8'd8;
+			p_y = current_pos1[4:0] * 7'd8;
+		end
+		else begin
+			p_x = current_pos2[9:5] * 8'd8;
+			p_y = current_pos2[4:0] * 7'd8;
+		end
+		
     end // enable_signals
    
     // current_state registers
     always@(posedge clk)
     begin: state_FFs
-        if(incrementer == 6'b111111)begin
-				if(current_state == S_CLEAR_PAST)
-					current_pos <= next_pos;
-				if(current_state == S_WAIT) begin
-					if (wait_counter == 15'b111111111111111) begin
-						current_state <= next_pos != current_pos? next_state : current_state;
-						wait_counter <= 15'd0;
-					end
-					else
-						wait_counter <= wait_counter + 15'd1;
-				end
+		  if (current_state == S_WALLER) begin
+				if (wall_index < 9'd299)
+					wall_index <= wall_index + 1'b1;
 				else
 					current_state <= next_state;
-				incrementer <= 6'b000000;
-			end
-	    else
-			incrementer <= incrementer + 6'b000001;
+		  end
+		  else begin
+			  if(incrementer == 6'b111111) begin
+					if(current_state == S_CLEAR_PAST)
+						if (p1_or_p2)
+							current_pos1 <= next_pos;
+						else
+							current_pos2 <= next_pos;
+						
+					if(current_state == S_WAIT) begin
+						if (wait_counter == 15'b111111111111111) begin
+							if (p1_or_p2)
+								current_state <= next_pos != current_pos1? next_state : current_state;
+							else
+								current_state <= next_pos != current_pos2? next_state : current_state;
+							
+							wait_counter <= 15'd0;
+						end
+						else
+							wait_counter <= wait_counter + 15'd1;
+					end
+					else
+						current_state <= next_state;
+					incrementer <= 6'b000000;
+				end
+			 else
+				incrementer <= incrementer + 6'b000001;
+		end
     end // state_FFS
 endmodule
 
