@@ -21,12 +21,9 @@ module bomberman(
 	wire [7:0] x;
 	wire [6:0] y;
 	wire writeEn;
+	wire sample_scan, upper_case;
 	
-	keyboard kb(
-		.mapped_key(key_input[7:0]),
-		.kb_clock(PS2_KBCLK),
-		.kb_data(PS2_KBDAT)
-	);
+	keyboard kb(CLOCK_50, 1'b0,PS2_KBDAT, PS2_KBCLK,key_input, sample_scan, upper_case);
 
 	// Create an Instance of a VGA controller - there can be only one!
 	// Define the number of colours as well as the initial background
@@ -83,7 +80,7 @@ module bomberman(
 		.writeEn(writeEn)//BIG KIDS
     	);
 		
-	hex_display h0(key_input[3:0],HEX0);
+	hex_display h0(key_input,HEX0);
     // Instansiate FSM control
     
     
@@ -108,10 +105,10 @@ module p1control(
     localparam  S_WAIT          = 5'd0,
                 S_CLEAR_PAST    = 5'd1,
                 S_DRAW_NEW      = 5'd2,
-				K_UP 			= 8'b0001,
-				K_DOWN 			= 8'b0010,
-				K_LEFT 			= 8'b0100,
-				K_RIGHT 		= 8'b1000;
+				K_UP 			= 4'd0,
+				K_DOWN 			= 4'd1,
+				K_LEFT 			= 4'd2,
+				K_RIGHT 		= 4'd3;
     
     // Next state logic aka our state table
     always@(*)
