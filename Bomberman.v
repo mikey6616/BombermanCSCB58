@@ -107,8 +107,10 @@ module p1control(
 	reg [8:0] wall_index; 
     reg [5:0] current_state, next_state;
 	reg [9:0] current_pos, next_pos, current_pos1, current_pos2; 
-	reg [14:0] wait_counter;
+	reg [15:0] wait_counter;
 	reg p1_or_p2;
+	initial p1_or_p2 = 1'b0;
+	initial wall_index = 9'd0;
 	assign LEDR = key_sample;
    
 	 always@(posedge sample_key)
@@ -198,7 +200,7 @@ module p1control(
 			colour = 3'b000;
 		else if (current_state == S_WALLER) begin
 			colour = 3'b111;
-			en_draw = WALL_MAP[wall_index] ? 1'b1 : 1'b0;
+			en_draw = WALL_MAP[wall_index];
 		end
 		if (p1_or_p2) begin
 			p_x = current_pos1[9:5] * 8'd8;
@@ -214,38 +216,60 @@ module p1control(
     // current_state registers
     always@(posedge clk)
     begin: state_FFs
-		  if (current_state == S_WALLER) begin
-				if (wall_index < 9'd299)
-					wall_index <= wall_index + 1'b1;
+	 if (current_state == S_WALLER) begin
+				if(incrementer == 6'b111111) begin
+					if (wall_index < 9'd299) begin
+						wall_index <= wall_index + 1'b1;
+						if (current_pos1[9:5] < 5'd19)
+							current_pos1 <= current_pos1 + 10'b0000100000;
+						else begin
+							current_pos1 <= current_pos1[4:0] + 10'd1;
+						end
+					end
+					else begin
+						current_pos1 <= 10'b0001000010;
+						current_pos2 <= 10'b0001000011;
+						current_state <= next_state;
+					end
+					incrementer <= 6'd0;
+				end
 				else
-					current_state <= next_state;
+					incrementer <= incrementer + 6'b000001;
 		  end
 		  else begin
-			  if(incrementer == 6'b111111) begin
-					if(current_state == S_CLEAR_PAST)
-						if (p1_or_p2)
-							current_pos1 <= next_pos;
-						else
-							current_pos2 <= next_pos;
-						
-					if(current_state == S_WAIT) begin
-						if (wait_counter == 15'b111111111111111) begin
-							if (p1_or_p2)
-								current_state <= next_pos != current_pos1? next_state : current_state;
-							else
-								current_state <= next_pos != current_pos2? next_state : current_state;
-							
-							wait_counter <= 15'd0;
-						end
-						else
-							wait_counter <= wait_counter + 15'd1;
-					end
+			  if (current_state == S_WALLER) begin
+					if (wall_index < 9'd299)
+						wall_index <= wall_index + 1'b1;
 					else
 						current_state <= next_state;
-					incrementer <= 6'b000000;
-				end
-			 else
-				incrementer <= incrementer + 6'b000001;
+			  end
+			  else begin
+				  if(incrementer == 6'b111111) begin
+						if(current_state == S_CLEAR_PAST)
+							if (p1_or_p2)
+								current_pos1 <= next_pos;
+							else
+								current_pos2 <= next_pos;
+							
+						if(current_state == S_WAIT) begin
+							if (wait_counter == 16'b1111111110000000) begin
+								if (p1_or_p2)
+									current_state <= next_pos != current_pos1 && WALL_MAP[next_pos[4:0] * 9'd20 + next_pos[9:5]] == 1'b0 ? next_state : current_state;
+								else
+									current_state <= next_pos != current_pos2 && WALL_MAP[next_pos[4:0] * 9'd20 + next_pos[9:5]] == 1'b0 ? next_state : current_state;
+								
+								wait_counter <= 16'd0;
+							end
+							else
+								wait_counter <= wait_counter + 16'd1;
+						end
+						else
+							current_state <= next_state;
+						incrementer <= 6'b000000;
+					end
+				 else
+					incrementer <= incrementer + 6'b000001;
+			end
 		end
     end // state_FFS
 endmodule
