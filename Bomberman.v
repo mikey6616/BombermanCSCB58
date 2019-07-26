@@ -70,6 +70,8 @@ module bomberman(
 		.colour(colour),
 		.en_draw(en_draw),
 		.incrementer(incrementer),
+		.end_game(end_game),
+		.counter(counter)
     	);
 
 	datapath D0(
@@ -80,7 +82,9 @@ module bomberman(
 		.p_y(p_y),//BIG KIDS
         .x(x),//BIG KIDS
 		.y(y),//BIG KIDS
-		.writeEn(writeEn)//BIG KIDS
+		.writeEn(writeEn),//BIG KIDS
+		.end_game(end_game),
+		.counter(counter)
     	);
 		
 	hex_display h0(key_input[3:0],HEX0);
@@ -101,7 +105,9 @@ module p1control(
     output reg  [5:0] incrementer,
 	output reg [7:0] p_x,
 	output reg [6:0] p_y,
-	output reg [2:0] colour
+	output reg [2:0] colour,
+	output reg [27:0] counter,
+	output reg end_game
     );
 	reg key_sample, read_crates, draw_bomb1, draw_bomb2, explosion1, explosion2, clear_explosion;
 	reg [1:0] t_size1, r_size1, b_size1, l_size1, t_size2, r_size2, b_size2, l_size2, clear_inc;
@@ -127,6 +133,7 @@ module p1control(
 							  00000000000000000110
 							  00000000000000000000;
 	reg [299:0] EXPLOSIONS = 300'd0;
+	
 	assign LEDR = key_sample;
    
 	 always@(posedge sample_key)
@@ -144,6 +151,7 @@ module p1control(
 					 B1_RIGHT	     = 5'd7,
 					 B1_DOWN		 = 5'd8,
 					 B1_LEFT         = 5'd9,
+					 END_GAME	= 5'd10,
 				K_UP 			= 8'h75,
 				K_DOWN 			= 8'h72,
 				K_LEFT 			= 8'h6b,
@@ -169,7 +177,8 @@ module p1control(
 					B1_UP: next_state = B1_RIGHT;
 					B1_RIGHT: next_state = B1_DOWN;
 					B1_DOWN: next_state = B1_LEFT;
-					B1_LEFT: next_state = S_WAIT;
+					B1_LEFT: next_state = END_GAME;
+					
             default:  next_state = S_WAIT;
         endcase
     end // state_table
@@ -274,6 +283,8 @@ module p1control(
 			bomb_pos2 <= current_pos2;
 		  end
 		  if (current_state == S_WALLER) begin
+			counter <= 28'd0;
+			end_game <= 1'd0;
 				if(incrementer == 6'b111111) begin
 					if (wall_index < 9'd299) begin
 						wall_index <= wall_index + 1'b1;
@@ -300,6 +311,12 @@ module p1control(
 				else
 					incrementer <= incrementer + 6'b000001;
 		  end
+		  else if (current_state = GAME_OVER_TEXT) begin
+			if (end_game)
+				counter = counter + 1'b1;
+			end_game <= 1'd1;
+			
+			end
 		  else begin
 			  if(incrementer == 6'b111111) begin
 					if(current_state == S_CLEAR_PAST_P1) begin
@@ -496,24 +513,74 @@ module datapath(
     input [5:0] incrementer, 
 	input [7:0] p_x,
 	input [6:0] p_y,
-	
+	input end_game,
+	input [27:0] counter,
     output reg writeEn,
     output reg [7:0] x,
     output reg [6:0] y
     );
  
-
-    // If writer
-    always @(*)
-    begin
-		writeEn = 1'b0;
-		x = 4'd0;
-		y = 4'd0;		 
-		if (en_draw == 1'b1)	begin 
-			writeEn = 1'b1;
-			x = p_x + incrementer[5:3];
-			y = p_y + incrementer[2:0];
-		end
+    reg [7:0]x_offset;
+    reg [7:0]y_offset;
+    reg [7:0]width;
+	
+    reg [699:0] GAME_OVER_TEXT;
+	
+    assign GAME_OVER_TEXT[99:0] 	= 100'b0000000000000000000000000000000000000000011111000000000000000000000000000000111110000000000000000000;
+    assign GAME_OVER_TEXT[199:100] = 100'b0000000000000000000000000000000000000000111111100000000000000000000000000000111111000000000000000000;
+    assign GAME_OVER_TEXT[299:200] = 100'b0000000000000000001111001111000000000000100000100000011100001110111000111100000001000000000000000000;
+    assign GAME_OVER_TEXT[399:300] = 100'b0000000000000000010011001000100110001000100000100000010010010011001001000000110001000000000000000000;
+    assign GAME_OVER_TEXT[499:400] = 100'b0000000000000000000011000111100110001000100000100000001110010011001001111000100001000000000000000000;
+    assign GAME_OVER_TEXT[599:500] = 100'b0000000000000000000011000000100001010000100000100000000010010011001001000100100001000000000000000000;
+    assign GAME_OVER_TEXT[699:600] = 100'b0000000000000000000011001111000000100000011111000000011100010011001001111000011110000000000000000000;
+	 
+ 
+    if (end_game) begin
+	// for starting to draw
+			if (counter == 0)
+			begin
+				x = 0;
+				y = 0;
+			end
+			// information for drawing
+			width = 100;
+			x_offset = 0;
+			y_offset = 0;
+			
+			// draw the current information at the calculated position in pink
+			colour = 3'b101;
+			if(GAME_OVER_TEXT[0] == 1)
+			begin
+				draw_x = 12 + x_offset + x;
+				draw_y = 20 + y_offset + y;
+			end
+			
+			// set the position of the next pixel
+			if (x == width - 1)
+			begin
+				x = 0;
+				y = y + 1;
+			end
+			else
+				x = x + 1;
+			
+			// move to next overlay pixel and increment counter
+			GAME_OVER_TEXT = GAME_OVER_TEXT >> 1;
+			
+    end
+    else begin
+	// If writer
+	always @(*)
+	begin
+		    writeEn = 1'b0;
+		    x = 4'd0;
+		    y = 4'd0;		 
+		    if (en_draw == 1'b1)	begin 
+			    writeEn = 1'b1;
+			    x = p_x + incrementer[5:3];
+			    y = p_y + incrementer[2:0];
+		    end
+	end
     end
     
 endmodule
