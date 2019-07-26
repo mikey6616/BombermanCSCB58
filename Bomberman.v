@@ -103,11 +103,13 @@ module p1control(
 	output reg [6:0] p_y,
 	output reg [2:0] colour
     );
-	reg key_sample, read_crates;
+	reg key_sample, read_crates, draw_bomb1, draw_bomb2, explosion1, explosion2, clear_explosion;
+	reg [1:0] t_size1, r_size1, b_size1, l_size1, t_size2, r_size2, b_size2, l_size2, clear_inc;
+	reg [2:0] bomb_count1, bomb_count2;
 	initial read_crates = 1'b0
 	reg [8:0] wall_index; 
     reg [5:0] current_state, next_state;
-	reg [9:0] next_pos1, next_pos2, current_pos1, current_pos2, bomb_pos1, bomb_pos2; 
+	reg [9:0] next_pos1, next_pos2, current_pos1, current_pos2, bomb_pos1, bomb_pos2, exp_draw_pos; 
 	reg [14:0] wait_counter;
 	reg [299:0] CRATES = 300'b00000000000000000000
 							  00000000000000000110
@@ -124,6 +126,7 @@ module p1control(
 							  00000000000000000110
 							  00000000000000000110
 							  00000000000000000000;
+	reg [299:0] EXPLOSIONS = 300'd0;
 	assign LEDR = key_sample;
    
 	 always@(posedge sample_key)
@@ -137,6 +140,10 @@ module p1control(
 					 S_DRAW_NEW_P1   = 5'd3,
 					 S_CLEAR_PAST_P2 = 5'd4,
 					 S_DRAW_NEW_P2   = 5'd5,
+					 B1_UP		     = 5'd6,
+					 B1_RIGHT	     = 5'd7,
+					 B1_DOWN		 = 5'd8,
+					 B1_LEFT         = 5'd9,
 				K_UP 			= 8'h75,
 				K_DOWN 			= 8'h72,
 				K_LEFT 			= 8'h6b,
@@ -145,6 +152,8 @@ module p1control(
 				A_LEFT		= 8'h1c,
 				S_DOWN		= 8'h1b,
 				D_RIGHT		= 8'h23,
+				PLACE_BOMB1 = 8'hbb,
+				PLACE_BOMB2 = 8'hff,
 				WALL_MAP = 300'b111111111111111111111000000000000000000110011000000000011001100110000000000110011000000000000000000110000000000000000001100000001111000000011000000011110000000110000000111100000001100000000000000000011000000000000000000110011000000000011001100110000000000110011000000000000000000111111111111111111111;
     
     // Next state logic aka our state table
@@ -157,6 +166,10 @@ module p1control(
 					S_DRAW_NEW_P1: next_state = S_CLEAR_PAST_P2; // Loop in current state until value is input
 					S_CLEAR_PAST_P2: next_state = S_DRAW_NEW_P2; // Loop in current state until go signal goes low
 					S_DRAW_NEW_P2: next_state = S_WAIT;
+					B1_UP: next_state = B1_RIGHT;
+					B1_RIGHT: next_state = B1_DOWN;
+					B1_DOWN: next_state = B1_LEFT;
+					B1_LEFT: next_state = S_WAIT;
             default:  next_state = S_WAIT;
         endcase
     end // state_table
@@ -177,38 +190,74 @@ module p1control(
 					S_DOWN: next_pos2 = current_pos2 + 10'd1;
 					A_LEFT: next_pos2 = current_pos2 - 10'b0000100000;
 					D_RIGHT: next_pos2 = current_pos2 + 10'b0000100000;
-					default: begin 
+					PLACE_BOMB1: begin 
+						if (bomb_pos1 == 10'd0)
+							draw_bomb1 = 1'b1;
+					end
+					PLACE_BOMB2: begin 
+						if (bomb_pos2 == 10'd0)
+							draw_bomb2 = 1'b1;
+					end
+					default: begin
 						next_pos1 = next_pos1;
 						next_pos2 = next_pos2;
 					end
 				endcase
 			end
+			else begin
+				draw_bomb2 = 1'b0;
+				draw_bomb2 = 1'b0;
+			end	
 		end
 		else
 			en_draw = 1'b1;
 		
-		if(current_state == S_CLEAR_PAST_P1 || current_state == S_CLEAR_PAST_P2)
-			colour = 3'b000;
+		if(current_state == S_CLEAR_PAST_P1) begin
+			if (current_pos1 == bomb_pos1) begin
+				colour = 3'b100;
+				//draw_bomb1 = 1'b0;
+			end
+			else
+				colour = 3'b000;
+		end
+		else if (current_state == S_CLEAR_PAST_P2) begin
+			if (current_pos2 == bomb_pos2) begin
+				colour = 3'b100;
+				//draw_bomb2 = 1'b0;
+			end
+			else
+				colour = 3'b000;
+		end
 		else if (current_state == S_DRAW_NEW_P2)
 			colour = 3'b010;
 		else if (current_state == S_WALLER) begin
 			if (read_crates) begin
 				colour = 3'b110;
-				en_draw = CRATES[wall_index] ? 1'b1 : 1'b0;
+				en_draw = CRATES[wall_index];
 			end
 			else begin
 				colour = 3'b111;
-				en_draw = WALL_MAP[wall_index] ? 1'b1 : 1'b0;
+				en_draw = WALL_MAP[wall_index];
 			end
+		end
+		else if (current_state > 5'd5) begin
+			if (clear_explosion)
+				colour = 3'b000;
+			else
+				colour = 3'b011;
 		end
 		
 		if (current_state == S_DRAW_NEW_P1) begin
 			p_x = current_pos1[9:5] * 8'd8;
 			p_y = current_pos1[4:0] * 7'd8;
 		end
-		else begin
+		else if (current_state == S_DRAW_NEW_P2) begin
 			p_x = current_pos2[9:5] * 8'd8;
 			p_y = current_pos2[4:0] * 7'd8;
+		end
+		else
+			p_x = exp_draw_pos[9:5] * 8'd8;
+			p_y = exp_draw_pos[4:0] * 7'd8;
 		end
 		
     end // enable_signals
@@ -216,22 +265,32 @@ module p1control(
     // current_state registers
     always@(posedge clk)
     begin: state_FFs
+		  if (draw_bomb1) begin
+			bomb_count1 <= 3'b111;
+			bomb_pos1 <= current_pos1;
+		  end
+		  if(draw_bomb2) begin
+			bomb_count2 <= 3'b111;
+			bomb_pos2 <= current_pos2;
+		  end
 		  if (current_state == S_WALLER) begin
 				if(incrementer == 6'b111111) begin
 					if (wall_index < 9'd299) begin
 						wall_index <= wall_index + 1'b1;
-						if (current_pos[9:5] < 5'd19)
-							current_pos <= current_pos + 10'b0000100000;
+						if (exp_draw_pos[9:5] < 5'd19)
+							exp_draw_pos <= exp_draw_pos + 10'b0000100000;
 						else begin
-							current_pos <= current_pos[4:0] + 10'd1;
+							exp_draw_pos <= exp_draw_pos[4:0] + 10'd1;
 						end
 					end
 					else begin
 						if (read_crates) begin
-							current_pos <= 10'b0001000010;
+							current_pos2 <= 10'b0001000011;
+							current_pos1 <= 10'b0001000010;
 							current_state <= next_state;
 						end 
 						else begin
+							exp_draw_pos <= 10'd0;
 							read_crates <= 1'b1;
 							wall_index <= 9'd0;
 						end
@@ -252,17 +311,174 @@ module p1control(
 							current_state <= next_state;
 					end
 					else if (current_state == S_DRAW_NEW_P1)
-						current_state <= next_pos2 != current_pos2 ? next_state : S_WAIT;
+						current_state <= next_pos2 != current_pos2 && WALL_MAP[next_pos2[4:0] * 9'd20 + next_pos2[9:5]] == 1'b0  && next_pos2 != bomb_pos1  && CRATES[next_pos2[4:0] * 9'd20 + next_pos2[9:5]] == 1'b0? next_state : S_WAIT;
 					else if(current_state == S_WAIT) begin
 						if (wait_counter == 15'b111111111111111) begin
-							if (next_pos1 != current_pos1)
+							if (next_pos1 != current_pos1 && WALL_MAP[next_pos1[4:0] * 9'd20 + next_pos1[9:5]] == 1'b0 && next_pos1 != bomb_pos2 && CRATES[next_pos1[4:0] * 9'd20 + next_pos1[9:5]])
 								current_state <= next_state;
-							else if (next_pos2 != current_pos2)
+							else if (next_pos2 != current_pos2 && WALL_MAP[next_pos2[4:0] * 9'd20 + next_pos2[9:5]] == 1'b0 && next_pos2 != bomb_pos1 && CRATES[next_pos2[4:0] * 9'd20 + next_pos2[9:5]])
 								current_state <= S_CLEAR_PAST_P2;
+							
+							if (bomb_count1 > 3'd0)
+								bomb_count1 <= bomb_count1 - 1'b1;
+							else if (bomb_pos1 != 10'd0) begin
+								if (explosion1 == 1'b0) begin
+									clear_explosion = 1'b0;
+									explosion1 <= 1'b1;
+									t_size1 <= 2'd0;
+									r_size1 <= 2'd0;
+									b_size1 <= 2'd0;
+									l_size1 <= 2'd0;
+									bomb_count1 <= 3'b111;
+									current_state <= B1_UP;
+									exp_draw_pos <= bomb_pos1;
+								end else begin
+									clear_explosion = 1'b1;
+									explosion1 <= 1'b0;
+									current_state <= B1_UP;
+									exp_draw_pos <= bomb_pos1;
+								end
+							end
+							if (bomb_count2 > 3'd0)
+								bomb_count2 <= bomb_count2 - 1'b1;
+							//PAste
 							wait_counter <= 15'd0;
 						end
 						else
 							wait_counter <= wait_counter + 15'd1;
+					end
+					else if (current_state == B1_UP) begin
+						//NONESENSE
+						if (clear_explosion) begin
+							clear_inc <= clear_inc + 1;
+							exp_draw_pos <= bomb_pos1 - clear_inc;
+							EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b0;
+							if (clear_inc == t_size1) begin
+								clear_inc <= 2'd0;
+								current_state <= next_state;
+							end
+						end
+						else begin
+							t_size1 <= t_size1 + 1;
+							exp_draw_pos <= bomb_pos1 - t_size1;
+							if (WALL_MAP[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] == 1'b1) begin
+								t_size1 <= t_size1 - 1;
+								exp_draw_pos <= bomb_pos1 - t_size1;
+								EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b1;
+								current_state <= next_state;
+							end
+							else if (CRATES[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] == 1'b1) begin
+								CRATES[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b0;
+								EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b1;
+								current_state <= next_state;
+							end
+							else if (t_size1 == 2'd3) begin
+								EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b1;
+								current_state <= next_state;
+							end
+							else
+								EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b1;
+						end
+					end
+					else if (current_state == B1_RIGHT) begin
+						//NONESENSE
+						if (clear_explosion) begin
+							clear_inc <= clear_inc + 1;
+							exp_draw_pos <= bomb_pos1 + {3'd0,{clear_inc, 5'd0}};
+							EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b0;
+							if (clear_inc == t_size1) begin
+								clear_inc <= 2'd0;
+								current_state <= next_state;
+							end
+						end
+						else begin
+							r_size1 <= r_size1 + 1;
+							exp_draw_pos <= bomb_pos1 + {3'd0,{r_size1, 5'd0}};
+							if (WALL_MAP[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] == 1'b1) begin
+								r_size1 <= r_size1 - 1;
+								exp_draw_pos <= bomb_pos1 + {3'd0,{r_size1, 5'd0}};
+								EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b1;
+								current_state <= next_state;
+							end
+							else if (CRATES[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] == 1'b1) begin
+								CRATES[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b0;
+								EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b1;
+								current_state <= next_state;
+							end
+							else if (r_size1 == 2'd3) begin
+								EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b1;
+								current_state <= next_state;
+							end
+							else
+								EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b1;
+						end
+					end
+					else if (current_state == B1_DOWN) begin
+						//NONESENSE
+						if (clear_explosion) begin
+							clear_inc <= clear_inc + 1;
+							exp_draw_pos <= bomb_pos1 + clear_inc;
+							EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b0;
+							if (clear_inc == t_size1) begin
+								clear_inc <= 2'd0;
+								bomb_pos1 = 10'd0;
+								current_state <= next_state;
+							end
+						end
+						else begin
+							b_size1 <= b_size1 + 1;
+							exp_draw_pos <= bomb_pos1 + b_size1;
+							if (WALL_MAP[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] == 1'b1) begin
+								b_size1 <= b_size1 - 1;
+								exp_draw_pos <= bomb_pos1 + b_size1;
+								EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b1;
+								current_state <= next_state;
+							end
+							else if (CRATES[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] == 1'b1) begin
+								CRATES[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b0;
+								EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b1;
+								current_state <= next_state;
+							end
+							else if (b_size1 == 2'd3) begin
+								EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b1;
+								current_state <= next_state;
+							end
+							else
+								EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b1;
+						end
+					end
+					else if (current_state == B1_LEFT) begin
+						//NONESENSE
+						if (clear_explosion) begin
+							clear_inc <= clear_inc + 1;
+							exp_draw_pos <= bomb_pos1 - {3'd0,{clear_inc, 5'd0}};
+							EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b0;
+							if (clear_inc == t_size1) begin
+								clear_inc <= 2'd0;
+								current_state <= next_state;
+							end
+						end
+						else begin
+							l_size1 <= l_size1 + 1;
+							exp_draw_pos <= bomb_pos1 - {3'd0,{l_size1, 5'd0}};
+							if (WALL_MAP[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] == 1'b1) begin
+								l_size1 <= l_size1 - 1;
+								exp_draw_pos <= bomb_pos1 - {3'd0,{l_size1, 5'd0}};
+								EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b1;
+								current_state <= next_state;
+							end
+							else if (CRATES[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] == 1'b1) begin
+								CRATES[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b0;
+								EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b1;
+								current_state <= next_state;
+							end
+							else if (l_size1 == 2'd3) begin
+								EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b1;
+								current_state <= next_state;
+							end
+							else
+								EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b1;
+						end
 					end
 					else
 						current_state <= next_state;
