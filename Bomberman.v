@@ -1,6 +1,6 @@
 // Part 2 skeleton
 
-module Bomberman( 
+module bomberman( 
 	input	CLOCK_50,				//	50 MHz
 	input 	PS2_KBCLK,
 	input 	PS2_KBDAT,
@@ -103,14 +103,27 @@ module p1control(
 	output reg [6:0] p_y,
 	output reg [2:0] colour
     );
-	reg key_sample;
+	reg key_sample, read_crates;
+	initial read_crates = 1'b0
 	reg [8:0] wall_index; 
     reg [5:0] current_state, next_state;
-	reg [9:0] current_pos, next_pos, current_pos1, current_pos2; 
-	reg [15:0] wait_counter;
-	reg p1_or_p2;
-	initial p1_or_p2 = 1'b0;
-	initial wall_index = 9'd0;
+	reg [9:0] next_pos1, next_pos2, current_pos1, current_pos2, bomb_pos1, bomb_pos2; 
+	reg [14:0] wait_counter;
+	reg [299:0] CRATES = 300'b00000000000000000000
+							  00000000000000000110
+							  00000000000000000110
+							  00000000000000000000
+							  00000000000000000000
+							  00000000000000000000
+							  00000000000000000000
+							  00000000000000000000
+							  00000000000000000000
+							  00000000000000000000
+							  00000000000000000000
+							  00000000000000000110
+							  00000000000000000110
+							  00000000000000000110
+							  00000000000000000000;
 	assign LEDR = key_sample;
    
 	 always@(posedge sample_key)
@@ -118,10 +131,12 @@ module p1control(
         key_sample <= key_sample ? 1'b0 : 1'b1;
     end // state_FFS
 	 
-    localparam  S_WALLER 		  = 5'd0,
+    localparam  	 S_WALLER 		 = 5'd0,
 					 S_WAIT          = 5'd1,
-                S_CLEAR_PAST    = 5'd2,
-                S_DRAW_NEW      = 5'd3,
+					 S_CLEAR_PAST_P1 = 5'd2,
+					 S_DRAW_NEW_P1   = 5'd3,
+					 S_CLEAR_PAST_P2 = 5'd4,
+					 S_DRAW_NEW_P2   = 5'd5,
 				K_UP 			= 8'h75,
 				K_DOWN 			= 8'h72,
 				K_LEFT 			= 8'h6b,
@@ -136,10 +151,12 @@ module p1control(
     always@(*)
     begin: state_table 
             case (current_state)
-					 S_WALLER: next_state =  S_WAIT;
-                S_WAIT: next_state = S_CLEAR_PAST; // Loop in current state until value is input
-                S_CLEAR_PAST: next_state = S_DRAW_NEW; // Loop in current state until go signal goes low
-                S_DRAW_NEW: next_state = S_WAIT; // Loop in current state until value is input
+					S_WALLER: next_state =  S_WAIT;
+					S_WAIT: next_state = S_CLEAR_PAST_P1; // Loop in current state until value is input
+					S_CLEAR_PAST_P1: next_state = S_DRAW_NEW_P1; // Loop in current state until go signal goes low
+					S_DRAW_NEW_P1: next_state = S_CLEAR_PAST_P2; // Loop in current state until value is input
+					S_CLEAR_PAST_P2: next_state = S_DRAW_NEW_P2; // Loop in current state until go signal goes low
+					S_DRAW_NEW_P2: next_state = S_WAIT;
             default:  next_state = S_WAIT;
         endcase
     end // state_table
@@ -148,61 +165,44 @@ module p1control(
     always @(*)
     begin: enable_signals
 		en_draw = 1'b0;
-		if (p1_or_p2)
-			colour = 3'b001;
-		else
-			colour = 3'b110;
-        if (current_state == S_WAIT && sample_key) begin
-			case (key_input)
-				K_UP: begin
-					next_pos = current_pos1 - 10'd1;
-					p1_or_p2 = 1'b1;
+		colour = 3'b001;
+        if (current_state == S_WAIT) begin
+			if (sample_key) begin
+				case (key_input)
+					K_UP: next_pos1 = current_pos1 - 10'd1;
+					K_DOWN: next_pos1 = current_pos1 + 10'd1;
+					K_LEFT: next_pos1 = current_pos1 - 10'b0000100000;
+					K_RIGHT: next_pos1 = current_pos1 + 10'b0000100000;
+					W_UP: next_pos2 = current_pos2 - 10'd1;
+					S_DOWN: next_pos2 = current_pos2 + 10'd1;
+					A_LEFT: next_pos2 = current_pos2 - 10'b0000100000;
+					D_RIGHT: next_pos2 = current_pos2 + 10'b0000100000;
+					default: begin 
+						next_pos1 = next_pos1;
+						next_pos2 = next_pos2;
 					end
-				K_DOWN: begin
-					next_pos = current_pos1 + 10'd1;
-					p1_or_p2 = 1'b1;
-					end
-				K_LEFT: begin
-					next_pos = current_pos1 - 10'b0000100000;
-					p1_or_p2 = 1'b1;
-					end
-				K_RIGHT: begin
-					next_pos = current_pos1 + 10'b0000100000;
-					p1_or_p2 = 1'b1;
-					end
-				W_UP: begin
-					next_pos = current_pos2 - 10'd1;
-					p1_or_p2 = 1'b0;
-					end
-				S_DOWN: begin
-					next_pos = current_pos2 + 10'd1;
-					p1_or_p2 = 1'b0;
-					end
-				A_LEFT: begin
-					next_pos = current_pos2 - 10'b0000100000;
-					p1_or_p2 = 1'b0;
-					end
-				D_RIGHT: begin
-					next_pos = current_pos2 + 10'b0000100000;
-					p1_or_p2 = 1'b0;
-					end
-				default: begin 
-				if (p1_or_p2)
-					next_pos = current_pos1;
-				else
-					next_pos = current_pos2;
-				end
-			endcase
+				endcase
+			end
 		end
 		else
 			en_draw = 1'b1;
-		if(current_state == S_CLEAR_PAST)
+		
+		if(current_state == S_CLEAR_PAST_P1 || current_state == S_CLEAR_PAST_P2)
 			colour = 3'b000;
+		else if (current_state == S_DRAW_NEW_P2)
+			colour = 3'b010;
 		else if (current_state == S_WALLER) begin
-			colour = 3'b111;
-			en_draw = WALL_MAP[wall_index];
+			if (read_crates) begin
+				colour = 3'b110;
+				en_draw = CRATES[wall_index] ? 1'b1 : 1'b0;
+			end
+			else begin
+				colour = 3'b111;
+				en_draw = WALL_MAP[wall_index] ? 1'b1 : 1'b0;
+			end
 		end
-		if (p1_or_p2) begin
+		
+		if (current_state == S_DRAW_NEW_P1) begin
 			p_x = current_pos1[9:5] * 8'd8;
 			p_y = current_pos1[4:0] * 7'd8;
 		end
@@ -216,20 +216,25 @@ module p1control(
     // current_state registers
     always@(posedge clk)
     begin: state_FFs
-	 if (current_state == S_WALLER) begin
+		  if (current_state == S_WALLER) begin
 				if(incrementer == 6'b111111) begin
 					if (wall_index < 9'd299) begin
 						wall_index <= wall_index + 1'b1;
-						if (current_pos1[9:5] < 5'd19)
-							current_pos1 <= current_pos1 + 10'b0000100000;
+						if (current_pos[9:5] < 5'd19)
+							current_pos <= current_pos + 10'b0000100000;
 						else begin
-							current_pos1 <= current_pos1[4:0] + 10'd1;
+							current_pos <= current_pos[4:0] + 10'd1;
 						end
 					end
 					else begin
-						current_pos1 <= 10'b0001000010;
-						current_pos2 <= 10'b0001000011;
-						current_state <= next_state;
+						if (read_crates) begin
+							current_pos <= 10'b0001000010;
+							current_state <= next_state;
+						end 
+						else begin
+							read_crates <= 1'b1;
+							wall_index <= 9'd0;
+						end
 					end
 					incrementer <= 6'd0;
 				end
@@ -237,39 +242,34 @@ module p1control(
 					incrementer <= incrementer + 6'b000001;
 		  end
 		  else begin
-			  if (current_state == S_WALLER) begin
-					if (wall_index < 9'd299)
-						wall_index <= wall_index + 1'b1;
-					else
-						current_state <= next_state;
-			  end
-			  else begin
-				  if(incrementer == 6'b111111) begin
-						if(current_state == S_CLEAR_PAST)
-							if (p1_or_p2)
-								current_pos1 <= next_pos;
-							else
-								current_pos2 <= next_pos;
-							
-						if(current_state == S_WAIT) begin
-							if (wait_counter == 16'b1111111110000000) begin
-								if (p1_or_p2)
-									current_state <= next_pos != current_pos1 && WALL_MAP[next_pos[4:0] * 9'd20 + next_pos[9:5]] == 1'b0 ? next_state : current_state;
-								else
-									current_state <= next_pos != current_pos2 && WALL_MAP[next_pos[4:0] * 9'd20 + next_pos[9:5]] == 1'b0 ? next_state : current_state;
-								
-								wait_counter <= 16'd0;
-							end
-							else
-								wait_counter <= wait_counter + 16'd1;
+			  if(incrementer == 6'b111111) begin
+					if(current_state == S_CLEAR_PAST_P1) begin
+							current_pos1 <= next_pos1;
+							current_state <= next_state;
+					end
+					else if(current_state == S_CLEAR_PAST_P2) begin
+							current_pos2 <= next_pos2;
+							current_state <= next_state;
+					end
+					else if (current_state == S_DRAW_NEW_P1)
+						current_state <= next_pos2 != current_pos2 ? next_state : S_WAIT;
+					else if(current_state == S_WAIT) begin
+						if (wait_counter == 15'b111111111111111) begin
+							if (next_pos1 != current_pos1)
+								current_state <= next_state;
+							else if (next_pos2 != current_pos2)
+								current_state <= S_CLEAR_PAST_P2;
+							wait_counter <= 15'd0;
 						end
 						else
-							current_state <= next_state;
-						incrementer <= 6'b000000;
+							wait_counter <= wait_counter + 15'd1;
 					end
-				 else
-					incrementer <= incrementer + 6'b000001;
-			end
+					else
+						current_state <= next_state;
+					incrementer <= 6'd0;
+				end
+			 else
+				incrementer <= incrementer + 6'b000001;
 		end
     end // state_FFS
 endmodule
