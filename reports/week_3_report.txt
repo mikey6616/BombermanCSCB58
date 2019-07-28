@@ -1,0 +1,86 @@
+CSCB58 Project Report: Summer 2019
+
+Team Member A
+-------------
+First Name: Michael
+Last Name: Rossinski
+Student Number: 1004310738
+UofT E-mail Address: michael.rossinski@mail.utoronto.ca
+
+
+Team Member B
+-------------
+First Name: Rostyslav
+Last Name: Kulnevsky
+Student Number: 1004344300
+UofT E-mail Address: rostyslav.kulnevsky@mail.utoronto.ca
+
+Team Member C (Optional)
+-------------
+First Name: 
+Last Name:
+Student Number:
+UofT E-mail Address:
+
+Team Member D (Optional)
+-------------
+First Name: 
+Last Name:
+Student Number:
+UofT E-mail Address:
+
+
+Project Plan
+--------
+
+Project Title: Bomberman
+
+
+Provide a one paragraph description of your project: 
+
+Bomberman is a famous classic grid-based game genre, where players place bombs to detonate in all 4 directions (up, down, left, right) and destroy blocks, allowing players to progress (if they dodge the explosion as well!) Playable with 2 players, facing off against eachother!
+
+
+What is your plan for the first week?
+
+Figure out which hardware we need, plan out code structure.
+
+What is your plan for the second week?
+
+Begin creating the game from bottom-up, after finding hardware essentials
+
+What is your plan for the third week?
+
+Finalize code and add/remove any wanted/unwanted features
+
+What is your backup plan if things don't work out as planned?
+
+The backup plan would be to make Bomberman not with 2 players, but instead a different design — leaning towards singleplayer. The details of this are to be discussed.
+
+
+Weekly Reports
+--------------
+
+Week 1: 
+	We came up with the broad idea for how we will implement the game's code, as well as what hardware we need.. We decided to 
+	simply use a PS2 keyboard with a VGA display, since all we need are simple control inputs. We also decided that we will draw 
+	out the game-grid first (walls and such), and will draw the boxes next, then the players ontop of that, all after an initial 
+	title screen. We will continue to code this going into Week 2.
+
+Week 2: 
+	We created the keyboard module and also found a way to map keys and move a square around on screen. The rest of the game's code will be based on this building block. We will further improve on the movement system as well as code the overall game itself.
+
+Week 3: 
+	We created two-player functionality as well as walls, along with hit detection. We decided to do a twist on a 2 player chase-and-collect game due to time constraints. This game will feature simple 2 player controls and is not nearly as complicated as our original vision of Bombermna.
+
+References
+----------
+<In this space clearly indicate all external sources used in this project. If you used anyone else's code (from previous B58 projects or other sources) clearly indicate what you used and where you found it. Usage of any material not credited in this space will be considered plagiarism. It is absolutely OK and expected to update this section as you progress in the projected.
+
+Make sure to document what you added on top of the existing work, especially if you work with a previous project. What is it that YOU added?>
+
+
+
+Repo & Video
+------------
+<At the end of the project, provide links to your code repository and presentation video (and passwords if not public), if you don't want us to publish this info on future course websites, just say so here>
