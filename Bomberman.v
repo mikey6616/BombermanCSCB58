@@ -140,11 +140,12 @@ module p1control(
 					 B2_RIGHT	     = 5'd11,
 					 B2_DOWN		 = 5'd12,
 					 B2_LEFT         = 5'd13,
-					 SPAWN_P1        = 5'd14,
-					 SPAWN_P2        = 5'd15,
-					 P1_WIN          = 5'd16,
-					 P2_WIN          = 5'd17,
-					 P12_WIN         = 5'd18,
+					 DRAW_LAST        = 5'd14,
+					 SPAWN_P1        = 5'd15,
+					 SPAWN_P2        = 5'd16,
+					 P1_WIN          = 5'd17,
+					 P2_WIN          = 5'd18,
+					 P12_WIN         = 5'd19,
 				K_UP 			= 8'h75,
 				K_DOWN 			= 8'h72,
 				K_LEFT 			= 8'h6b,
@@ -241,7 +242,7 @@ module p1control(
 			else 
 				colour = 3'b000;
 		end
-		else if (current_state > 5'd5) begin
+		else if (current_state > 5'd5 && current_state < 5'd15) begin
 			if (clear_explosion)
 				colour = 3'b000;
 			else
@@ -530,7 +531,7 @@ module p1control(
 									l_size1 <= l_size1 + 1;
 									exp_draw_pos <= next_exp_pos;
 									next_exp_pos <= bomb_pos1;
-									current_state <= next_state;
+									current_state <= DRAW_LAST;
 								end
 								else begin
 									EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b1;
@@ -711,7 +712,7 @@ module p1control(
 									l_size2 <= l_size2 + 1;
 									exp_draw_pos <= next_exp_pos;
 									next_exp_pos <= bomb_pos2;
-									current_state <= next_state;
+									current_state <= DRAW_LAST;
 								end
 								else begin
 									EXPLOSIONS[exp_draw_pos[4:0] * 9'd20 + exp_draw_pos[9:5]] <= 1'b1;
@@ -722,7 +723,7 @@ module p1control(
 							end
 						end
 						default: begin 
-							if (current_state > 5'd15) begin
+							if (current_state > 5'd16) begin
 								if (exp_draw_pos[9:5] < 5'd19)
 									exp_draw_pos <= exp_draw_pos + 10'b0000100000;
 								else begin
