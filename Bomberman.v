@@ -309,13 +309,13 @@ module p1control(
 								current_state <= next_state;
 						end
 						S_DRAW_NEW_P1:
-							current_state <= next_pos2 != current_pos2 && WALL_MAP[next_pos2[4:0] * 9'd20 + next_pos2[9:5]] == 1'b0 && next_pos2 != bomb_pos1 && CRATES[next_pos2[4:0] * 9'd20 + next_pos2[9:5]] == 1'b0 ? next_state : S_WAIT;
+							current_state <= next_pos2 != current_pos2 && next_pos2 != current_pos1 && WALL_MAP[next_pos2[4:0] * 9'd20 + next_pos2[9:5]] == 1'b0 && next_pos2 != bomb_pos1 && CRATES[next_pos2[4:0] * 9'd20 + next_pos2[9:5]] == 1'b0 ? next_state : S_WAIT;
 						S_WAIT: begin
 							check_clock <= check_clock ? 1'b0 : 1'b1;
 							if (wait_counter == 15'b111111111111111) begin
-								if (next_pos1 != current_pos1 && WALL_MAP[next_pos1[4:0] * 9'd20 + next_pos1[9:5]] == 1'b0 && next_pos1 != bomb_pos2 && CRATES[next_pos1[4:0] * 9'd20 + next_pos1[9:5]] == 1'b0)
+								if (next_pos1 != current_pos1 && next_pos1 != current_pos2 && WALL_MAP[next_pos1[4:0] * 9'd20 + next_pos1[9:5]] == 1'b0 && next_pos1 != bomb_pos2 && CRATES[next_pos1[4:0] * 9'd20 + next_pos1[9:5]] == 1'b0)
 									current_state <= next_state;
-								else if (next_pos2 != current_pos2 && WALL_MAP[next_pos2[4:0] * 9'd20 + next_pos2[9:5]] == 1'b0 && next_pos2 != bomb_pos1 && CRATES[next_pos2[4:0] * 9'd20 + next_pos2[9:5]] == 1'b0)
+								else if (next_pos2 != current_pos2 && next_pos2 != current_pos1 && WALL_MAP[next_pos2[4:0] * 9'd20 + next_pos2[9:5]] == 1'b0 && next_pos2 != bomb_pos1 && CRATES[next_pos2[4:0] * 9'd20 + next_pos2[9:5]] == 1'b0)
 									current_state <= S_CLEAR_PAST_P2;
 								
 								if (bomb_count1 > 5'd0)
