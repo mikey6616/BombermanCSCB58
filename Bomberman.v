@@ -1,6 +1,6 @@
 // Part 2 skeleton
 
-module Bomberman( 
+module bomberman( 
 	input	CLOCK_50,				//	50 MHz
 	input 	PS2_KBCLK,
 	input 	PS2_KBDAT,
@@ -108,18 +108,25 @@ module p1control(
 	reg [1:0] t_size1, r_size1, b_size1, l_size1, t_size2, r_size2, b_size2, l_size2, clear_inc;
 	reg [4:0] bomb_count1, bomb_count2;
 	reg [8:0] wall_index; 
-    reg [5:0] current_state, next_state;
+    reg [4:0] current_state, next_state;
 	reg [9:0] next_pos1, next_pos2, current_pos1, current_pos2, bomb_pos1, bomb_pos2, exp_draw_pos, next_exp_pos;
 	initial bomb_pos1 = 10'd0;
 	initial bomb_pos2 = 10'd0;
+	initial draw_bomb1 = 1'b0;
+	initial draw_bomb2 = 1'b0;
+	initial wall_index = 9'd0;
+	initial exp_draw_pos = 10'd0;
 	initial next_pos1 = 10'b0000100001;
 	initial next_pos2 = 10'b1001001101;
+	initial current_pos1 = 10'd0;
+	initial current_pos2 = 10'd0;
+	initial current_state = 5'd0;
 	reg [14:0] wait_counter;
 	reg [299:0] CRATES;
 	initial CRATES = 300'b000000000000000000000000011001000110000000000000001000000000000000000100000000000110000000100000011001111111111111111110000000000000000000000111111100001111111000000000000000000000011111111111111111100110000000100000011000000000010000000000000000000010000000000000011001000110000000000000000000000000;
 	reg [299:0] EXPLOSIONS;
 	initial	EXPLOSIONS = 300'd0;
-	assign LEDR = key_sample;
+	assign LEDR = bomb_pos2[0];
    
 	 always@(posedge sample_key)
     begin: FLIPPER
@@ -743,7 +750,7 @@ module p1control(
 				end
 			 else
 				incrementer <= incrementer + 6'd1;
-			if (explosion1 || explosion2) begin
+			if (explosion1 == 1'b1 || explosion2 == 1'b1) begin
 				if (EXPLOSIONS[current_pos1[4:0] * 9'd20 + current_pos1[9:5]] == 1'b1 && EXPLOSIONS[current_pos2[4:0] * 9'd20 + current_pos2[9:5]] == 1'b1) begin
 					current_state <= P12_WIN;
 					exp_draw_pos <= 10'd0;
@@ -780,7 +787,7 @@ module datapath(
     output reg [7:0] x,
     output reg [6:0] y
     );
-	localparam  	 PLAYER 		 = 64'b1100001110000001001001000000000000000000100000010001100000011000,
+	localparam  	 PLAYER 		 = 64'b0001100000011000100000010000000000000000001001001000000111000011,
 					 WALL  	 		 = 64'b1000000100000000000000000000000000000000000000000000000010000001,
 					 CRATE 		     = 64'b0000000001111110010110100101101001011010010110100111111000000000,
 					 BOMB 		     = 64'b1100001110000101000000100000000000000000000000101000010111000011,
