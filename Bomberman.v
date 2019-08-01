@@ -724,11 +724,16 @@ module p1control(
 						end
 						default: begin 
 							if (current_state > 5'd16) begin
-								if (exp_draw_pos[9:5] < 5'd19)
-									exp_draw_pos <= exp_draw_pos + 10'b0000100000;
-								else begin
-									exp_draw_pos <= exp_draw_pos[4:0] + 10'd1;
+								if (wait_counter == 15'b111111111111111) begin
+									if (exp_draw_pos[9:5] < 5'd19)
+										exp_draw_pos <= exp_draw_pos + 10'b0000100000;
+									else begin
+										exp_draw_pos <= exp_draw_pos[4:0] + 10'd1;
+									end
+									wait_counter <= 15'd0;
 								end
+								else
+								wait_counter <= wait_counter + 15'd1;
 							end
 							else
 								current_state <= next_state;
