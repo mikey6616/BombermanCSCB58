@@ -104,17 +104,16 @@ module p1control(
 	output reg [6:0] p_y,
 	output reg [2:0] colour
     );
-	reg key_sample, read_crates, draw_bomb1, draw_bomb2, explosion1, explosion2, clear_explosion, check_clock;
+	reg key_sample, draw_bomb1, draw_bomb2, explosion1, explosion2, clear_explosion, check_clock;
 	reg [1:0] t_size1, r_size1, b_size1, l_size1, t_size2, r_size2, b_size2, l_size2, clear_inc;
 	reg [4:0] bomb_count1, bomb_count2;
-	initial read_crates = 1'b0;
 	reg [8:0] wall_index; 
     reg [5:0] current_state, next_state;
 	reg [9:0] next_pos1, next_pos2, current_pos1, current_pos2, bomb_pos1, bomb_pos2, exp_draw_pos, next_exp_pos;
 	initial bomb_pos1 = 10'd0;
 	initial bomb_pos2 = 10'd0;
-	initial next_pos1 = 10'b0001000011;
-	initial next_pos2 = 10'b0001000011;
+	initial next_pos1 = 10'b0000100001;
+	initial next_pos2 = 10'b1001001101;
 	reg [14:0] wait_counter;
 	reg [299:0] CRATES;
 	initial CRATES = 300'b000000000000000000000000011001000110000000000000001000000000000000000100000000000110000000100000011001111111111111111110000000000000000000000111111100001111111000000000000000000000011111111111111111100110000000100000011000000000010000000000000000000010000000000000011001000110000000000000000000000000;
@@ -232,7 +231,7 @@ module p1control(
 			else
 				colour = 3'b000;
 		end
-		else if (current_state == S_DRAW_NEW_P2 || current_state == SPAWN_P2 || P2_WIN)
+		else if (current_state == S_DRAW_NEW_P2 || current_state == SPAWN_P2 || current_state == P2_WIN)
 			colour = 3'b010;
 		else if (current_state == S_WALLER) begin
 			if (WALL_MAP[wall_index])
@@ -351,7 +350,7 @@ module p1control(
 										clear_inc <= 2'd0;
 										explosion2 <= 1'b0;
 										current_state <= B2_UP;
-										exp_draw_pos <= bomb_pos1;
+										exp_draw_pos <= bomb_pos2;
 									end
 								end
 								//PAste
